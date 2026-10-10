@@ -1,14 +1,24 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.static('public'));
+// Middleware to parse JSON and URL-encoded bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-let allScannedPairs = [];   
-let matchedTrades = [];     
+// Serve static files from 'public' folder and handle root route for Vercel
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+let allScannedPairs = [];    
+let matchedTrades = [];        
 let overallHistory = [];
 let recentAlerts = [];
 
@@ -190,3 +200,6 @@ app.listen(PORT, () => {
     console.log(`🌐 Pure Memecoin Solana Terminal: http://localhost:${PORT}`);
     console.log(`==========================================\n`);
 });
+
+// Export app for Vercel serverless environment
+module.exports = app;
