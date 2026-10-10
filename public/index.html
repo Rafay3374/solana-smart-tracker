@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Pro Strategy & Live Chart Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #0c1017;
+            --bg-card: #131b26;
+            --bg-card-hover: #1a2332;
+            --border-color: #1e293b;
+            --accent-green: #00b894;
+            --accent-red: #ff7675;
+            --accent-blue: #0984e3;
+            --accent-amber: #fdcb6e;
+            --text-primary: #dfe6e9;
+            --text-secondary: #b2bec3;
+        }
+
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-primary); margin: 0; padding: 16px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header-nav { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 24px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .logo { font-size: 20px; font-weight: 800; color: #00cec9; display: flex; align-items: center; gap: 8px; }
+        .nav-tabs { display: flex; gap: 10px; }
+        .tab-btn { background: #1f293d; color: var(--text-secondary); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .tab-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .alert-ticker { background: #1a2332; border: 1px solid #0984e3; border-radius: 10px; padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
+        .alert-title { font-weight: 800; color: #00cec9; font-size: 13px; text-transform: uppercase; white-space: nowrap; }
+        .alert-feed { font-size: 13px; color: var(--text-primary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .metric-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; text-align: center; }
+        .metric-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
+        .metric-val { font-size: 22px; font-weight: 800; }
+
+        .table-container { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow-x: auto; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th { background: #1a2332; color: var(--text-secondary); padding: 14px 16px; font-weight: 700; border-bottom: 1px solid var(--border-color); }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); vertical-align: middle; }
+        tr:hover { background: var(--bg-card-hover); }
+
+        .token-cell { display: flex; align-items: center; gap: 10px; }
+        .token-symbol { font-weight: 800; font-size: 16px; color: #fff; }
+        .token-name { font-size: 12px; color: var(--text-secondary); }
+
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+        .badge-high { background: rgba(0, 184, 148, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .badge-medium { background: rgba(253, 203, 110, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+        .badge-closed { background: rgba(255, 118, 117, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+        .profit { color: var(--accent-green); font-weight: 700; }
+        .loss { color: var(--accent-red); font-weight: 700; }
+
+        .dex-btn { background: #2d3748; color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; border: none; transition: 0.2s; }
+        .dex-btn:hover { background: var(--accent-blue); }
+
+        /* Chart Modal Popup */
+        #chart-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); width: 90%; max-width: 1100px; height: 80vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #1a2332; border-bottom: 1px solid var(--border-color); }
+        .close-btn { background: #ff7675; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .iframe-container { flex-grow: 1; width: 100%; height: 100%; }
+        .iframe-container iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header-nav">
+            <div class="logo">⚡ SOLANA STRATEGY & LIVE CHART TERMINAL</div>
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('tab-all')">🎯 Strategy Matched Pairs (<span id="count-all">0</span>)</button>
+                <button class="tab-btn" onclick="switchTab('tab-trades')">⚡ Active $10 Trades & PnL</button>
+            </div>
+        </div>
+
+        <div class="alert-ticker">
+            <div class="alert-title">🔔 Live Feed:</div>
+            <div class="alert-feed" id="live-alert-text">Scanning strictly according to strategy...</div>
+        </div>
+
+        <!-- TAB 1: STRATEGY MATCHED PAIRS WITH BUY/SELL STATS -->
+        <div id="tab-all" class="tab-content active">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Token Pair</th>
+                            <th>Price (USD)</th>
+                            <th>1h Change</th>
+                            <th>24h Volume</th>
+                            <th>Liquidity</th>
+                            <th>Buys / Sells (1h)</th>
+                            <th>Strategy Status</th>
+                            <th>Live Chart & Stats</th>
+                        </tr>
+                    </thead>
+                    <tbody id="all-pairs-tbody">
+                        <tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-secondary);">Filtering strategy coins...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: ACTIVE TRADES -->
+        <div id="tab-trades" class="tab-content">
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="metric-title">Active Trades</div>
+                    <div class="metric-val" id="m-signals">0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-title">Total Allocated ($10/trade)</div>
+                    <div class="metric-val" id="m-invested">$0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-title">Portfolio Value</div>
+                    <div class="metric-val" id="m-value" style="color: var(--accent-green);">$0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-title">Net PnL</div>
+                    <div class="metric-val" id="m-pnl">0%</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Token Symbol</th>
+                            <th>Entry Price</th>
+                            <th>Current Price</th>
+                            <th>Allocation</th>
+                            <th>Current PnL ($ / %)</th>
+                            <th>Exit Status</th>
+                            <th>Live Chart</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matched-trades-tbody">
+                        <tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">Waiting for strategy triggers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Chart Modal -->
+    <div id="chart-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title" style="margin:0; color:#00cec9;">Live Candlestick Chart & Txns</h3>
+                <button class="close-btn" onclick="closeChartModal()">✕ Close</button>
+            </div>
+            <div class="iframe-container" id="iframe-wrap"></div>
+        </div>
+    </div>
+
+    <script>
+        let globalPairsData = [];
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function openChartModal(address, symbol) {
+            document.getElementById('modal-title').innerText = `Live Chart: ${symbol} (${address})IST`;
+            document.getElementById('iframe-wrap').innerHTML = `<iframe src="https://dexscreener.com/solana/${address}?embed=1&theme=dark&trades=0&info=0"></iframe>`;
+            document.getElementById('chart-modal').style.display = 'flex';
+        }
+
+        function closeChartModal() {
+            document.getElementById('chart-modal').style.display = 'none';
+            document.getElementById('iframe-wrap').innerHTML = '';
+        }
+
+        async function fetchTerminalData() {
+            try {
+                const res = await fetch('/api/dashboard');
+                const data = await res.json();
+
+                globalPairsData = data.allPairs || [];
+                const matchedTrades = data.matchedTrades || [];
+                const alerts = data.alerts || [];
+
+                document.getElementById('count-all').innerText = globalPairsData.length;
+
+                if (alerts.length > 0) {
+                    document.getElementById('live-alert-text').innerText = `[${alerts[0].time}] ${alerts[0].text}`;
+                }
+
+                // Tab 1 Table
+                const allTbody = document.getElementById('all-pairs-tbody');
+                allTbody.innerHTML = '';
+                if (globalPairsData.length === 0) {
+                    allTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px;">Searching coins matching strategy...</td></tr>`;
+                } else {
+                    globalPairsData.forEach(item => {
+                        const badgeClass = item.status.includes('High') ? 'badge-high' : 'badge-medium';
+                        const buys = item.txns?.buys || 0;
+                        const sells = item.txns?.sells || 0;
+
+                        allTbody.innerHTML += `
+                            <tr>
+                                <td>
+                                    <div class="token-cell">
+                                        <div>
+                                            <div class="token-symbol">${item.symbol}</div>
+                                            <div class="token-name"><code>${item.address.substring(0, 6)}...</code></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><b>$${item.price < 0.0001 ? item.price.toExponential(4) : item.price}</b></td>
+                                <td class="${item.priceChange1h >= 0 ? 'profit' : 'loss'}">${item.priceChange1h >= 0 ? '+' : ''}${item.priceChange1h}%</td>
+                                <td>$${item.volume24h.toLocaleString()}</td>
+                                <td>$${item.liquidity.toLocaleString()}</td>
+                                <td><span style="color:var(--accent-green); font-weight:700;">🟢 ${buys} Buys</span> / <span style="color:var(--accent-red); font-weight:700;">🔴 ${sells} Sells</span></td>
+                                <td><span class="badge ${badgeClass}">${item.status}</span></td>
+                                <td><button class="dex-btn" onclick="openChartModal('${item.address}', '${item.symbol}')">📊 Live Chart & Stats</button></td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                // Tab 2 Trades ($10 base)
+                let totalInvested = matchedTrades.length * 10;
+                let totalVal = matchedTrades.reduce((acc, t) => acc + t.currentValue, 0);
+                let overallPnl = totalInvested > 0 ? (((totalVal - totalInvested) / totalInvested) * 100).toFixed(2) : 0;
+
+                document.getElementById('m-signals').innerText = matchedTrades.length;
+                document.getElementById('m-invested').innerText = '$' + totalInvested;
+                document.getElementById('m-value').innerText = '$' + totalVal.toFixed(2);
+                document.getElementById('m-pnl').innerText = (overallPnl >= 0 ? '+' : '') + overallPnl + '%';
+                document.getElementById('m-pnl').style.color = overallPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+                const matchedTbody = document.getElementById('matched-trades-tbody');
+                matchedTbody.innerHTML = '';
+                if (matchedTrades.length === 0) {
+                    matchedTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px;">Waiting for strategy triggers ($10)...</td></tr>`;
+                } else {
+                    matchedTrades.forEach(item => {
+                        const isProfit = item.pnlPercentage >= 0;
+                        const isClosed = item.isClosed;
+
+                        matchedTbody.innerHTML += `
+                            <tr ${isClosed ? 'style="opacity:0.6;"' : ''}>
+                                <td><span style="font-weight:800; font-size:15px;">${item.symbol}</span></td>
+                                <td>$${item.buyPrice}</td>
+                                <td><b>$${item.currentPrice}</b></td>
+                                <td>$${item.initialInvestment}</td>
+                                <td class="${isProfit ? 'profit' : 'loss'}">$${item.currentValue} (${isProfit ? '+' : ''}${item.pnlPercentage}%)</td>
+                                <td><span class="badge ${isClosed ? 'badge-closed' : 'badge-high'}">${item.exitReason}</span></td>
+                                <td><button class="dex-btn" onclick="openChartModal('${item.address}', '${item.symbol}')">📊 Open Chart</button></td>
+                            </tr>
+                        `;
+                    });
+                }
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        fetchTerminalData();
+        setInterval(fetchTerminalData, 4000); // 4-second lightning-fast sync
+    </script>
+</body>
+</html>
